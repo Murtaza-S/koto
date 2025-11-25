@@ -14,7 +14,8 @@ struct kotoApp: App {
         let schema = Schema([
             Item.self,
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        let storeURL = URL.documentsDirectory.appending(path: "koto.store")
+        let modelConfiguration = ModelConfiguration(schema: schema, url: storeURL)
 
         do {
             return try ModelContainer(for: schema, configurations: [modelConfiguration])
@@ -28,5 +29,11 @@ struct kotoApp: App {
             ContentView()
         }
         .modelContainer(sharedModelContainer)
+    }
+}
+
+private extension URL {
+    static var documentsDirectory: URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     }
 }

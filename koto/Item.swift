@@ -10,9 +10,20 @@ import SwiftData
 
 @Model
 final class Item {
-    var timestamp: Date
+    var title: String
+    var createdAt: Date
+    var isDone: Bool?
     
-    init(timestamp: Date) {
-        self.timestamp = timestamp
+    init(title: String, createdAt: Date = .now, isDone: Bool = false) {
+        self.title = title
+        self.createdAt = createdAt
+        self.isDone = isDone
+    }
+}
+
+extension Item {
+    var isCompleted: Bool {
+        get { isDone ?? false }
+        set { isDone = newValue }
     }
 }
