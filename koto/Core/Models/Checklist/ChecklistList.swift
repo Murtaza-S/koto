@@ -18,6 +18,7 @@ final class ChecklistList {
     var createdAt: Date
     var updatedAt: Date
     var isArchived: Bool
+    var lastResetDate: Date?
 
     @Relationship(deleteRule: .cascade)
     var items: [ChecklistItem] = []
@@ -25,12 +26,13 @@ final class ChecklistList {
     init(
         id: UUID = UUID(),
         title: String,
-        type: ListType = .personal,
+        type: ListType = .custom,
         color: String? = nil,
         icon: String? = nil,
         createdAt: Date = .now,
         updatedAt: Date = .now,
         isArchived: Bool = false,
+        lastResetDate: Date? = nil,
         items: [ChecklistItem] = []
     ) {
         self.id = id
@@ -41,6 +43,7 @@ final class ChecklistList {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.isArchived = isArchived
+        self.lastResetDate = lastResetDate
         self.items = items
     }
 

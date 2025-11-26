@@ -132,7 +132,7 @@ struct ChecklistDetailView: View {
 
     private func delete(items: [ChecklistItem]) {
         withAnimation {
-            service.delete(items)
+            service.deleteItems(items)
         }
     }
 }

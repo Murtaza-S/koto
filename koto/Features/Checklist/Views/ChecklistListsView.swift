@@ -169,7 +169,7 @@ struct ContentView: View {
 
     private func deleteItems(_ items: [ChecklistItem]) {
         withAnimation {
-            service.delete(items)
+            service.deleteItems(items)
         }
     }
 }
