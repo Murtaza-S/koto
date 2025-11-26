@@ -12,7 +12,8 @@ import SwiftData
 struct kotoApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            ChecklistList.self,
+            ChecklistItem.self,
         ])
         let storeURL = URL.documentsDirectory.appending(path: "koto.store")
         let modelConfiguration = ModelConfiguration(schema: schema, url: storeURL)

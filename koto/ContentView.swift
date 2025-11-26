@@ -10,35 +10,42 @@ import SwiftData
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Item.createdAt, order: .reverse) private var items: [Item]
-    @State private var newTitle: String = ""
+    @Query(
+        filter: #Predicate<ChecklistList> { $0.isArchived == false },
+        sort: \ChecklistList.updatedAt,
+        order: .reverse,
+        animation: .default
+    ) private var checklists: [ChecklistList]
 
-    private var todoItems: [Item] {
-        items.filter { !$0.isCompleted }
-    }
+    @Query(
+        filter: #Predicate<ChecklistItem> { $0.isCompleted == true },
+        sort: \ChecklistItem.updatedAt,
+        order: .reverse,
+        animation: .default
+    ) private var completedItems: [ChecklistItem]
 
-    private var accomplishedItems: [Item] {
-        items.filter(\.isCompleted)
+    @State private var newListTitle: String = ""
+
+    private var service: ChecklistService {
+        ChecklistService(modelContext: modelContext)
     }
 
     var body: some View {
         TabView {
             NavigationStack {
                 VStack(spacing: 16) {
-                    addTodoField
-
-                    todoList
+                    addListField
+                    checklistList
                 }
                 .padding()
-                .navigationTitle("koto")
+                .navigationTitle("Checklists")
             }
             .tabItem {
                 Label("Todo", systemImage: "list.bullet.circle")
             }
 
             NavigationStack {
-                accomplishedList
-                    .padding(.top, 16)
+                completedItemsList
                     .navigationTitle("Accomplished")
             }
             .tabItem {
@@ -47,13 +54,13 @@ struct ContentView: View {
         }
     }
 
-    private var addTodoField: some View {
+    private var addListField: some View {
         HStack(spacing: 12) {
-            TextField("Add a todo", text: $newTitle, axis: .vertical)
+            TextField("Create a checklist", text: $newListTitle, axis: .vertical)
                 .textFieldStyle(.roundedBorder)
-                .onSubmit(addItem)
+                .onSubmit(addList)
 
-            Button(action: addItem) {
+            Button(action: addList) {
                 Image(systemName: "plus")
                     .font(.title2.weight(.bold))
                     .foregroundStyle(.white)
@@ -62,41 +69,50 @@ struct ContentView: View {
                         Circle()
                             .fill(Color.kotoAccent)
                     )
-                    .accessibilityLabel("Add todo")
+                    .accessibilityLabel("Add checklist")
             }
-            .disabled(newTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .disabled(newListTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             .buttonStyle(.plain)
         }
     }
 
-    private var todoList: some View {
+    private var checklistList: some View {
         List {
-            ForEach(todoItems) { item in
-                TodoRow(item: item, toggle: toggleCompletion)
-                    .swipeActions {
-                        Button(role: .destructive) {
-                            delete(items: [item])
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    }
+            ForEach(checklists) { list in
+                NavigationLink {
+                    ChecklistDetailView(list: list)
+                } label: {
+                    ChecklistRow(list: list)
+                }
             }
             .onDelete { offsets in
-                let targets = offsets.map { todoItems[$0] }
-                delete(items: targets)
+                let targets = offsets.map { checklists[$0] }
+                deleteLists(targets)
             }
         }
         .listStyle(.plain)
+        .overlay {
+            if checklists.isEmpty {
+                ContentUnavailableView(
+                    "No checklists yet",
+                    systemImage: "list.bullet.rectangle",
+                    description: Text("Create your first checklist to get started.")
+                )
+            }
+        }
     }
 
-    private var accomplishedList: some View {
+    private var completedItemsList: some View {
         List {
-            ForEach(accomplishedItems) { item in
-                HStack {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                    Text(item.title)
+            ForEach(completedItems) { item in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.text)
                         .foregroundStyle(.secondary)
+                    if let list = item.list {
+                        Text(list.title)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 .swipeActions(edge: .trailing) {
                     Button {
@@ -106,62 +122,75 @@ struct ContentView: View {
                     }
 
                     Button(role: .destructive) {
-                        delete(items: [item])
+                        deleteItems([item])
                     } label: {
                         Label("Delete", systemImage: "trash")
                     }
                 }
             }
             .onDelete { offsets in
-                let targets = offsets.map { accomplishedItems[$0] }
-                delete(items: targets)
+                let targets = offsets.map { completedItems[$0] }
+                deleteItems(targets)
             }
         }
         .listStyle(.plain)
+        .overlay {
+            if completedItems.isEmpty {
+                ContentUnavailableView(
+                    "No completed items",
+                    systemImage: "tray",
+                    description: Text("Completed checklist items will appear here.")
+                )
+            }
+        }
     }
 
-    private func addItem() {
-        let trimmed = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+    private func addList() {
+        let trimmed = newListTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
         withAnimation {
-            let newItem = Item(title: trimmed)
-            modelContext.insert(newItem)
-            newTitle = ""
+            service.createList(title: trimmed)
+            newListTitle = ""
         }
     }
 
-    private func toggleCompletion(_ item: Item) {
+    private func deleteLists(_ lists: [ChecklistList]) {
         withAnimation {
-            item.isCompleted.toggle()
+            service.deleteLists(lists)
         }
     }
 
-    private func delete(items: [Item]) {
+    private func toggleCompletion(_ item: ChecklistItem) {
         withAnimation {
-            items.forEach(modelContext.delete)
+            service.toggleCompletion(item)
+        }
+    }
+
+    private func deleteItems(_ items: [ChecklistItem]) {
+        withAnimation {
+            service.delete(items)
         }
     }
 }
 
-private struct TodoRow: View {
-    @Bindable var item: Item
-    let toggle: (Item) -> Void
+private struct ChecklistRow: View {
+    @Bindable var list: ChecklistList
 
     var body: some View {
-        HStack(spacing: 12) {
-            Button {
-                toggle(item)
-            } label: {
-                Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
-                    .foregroundColor(item.isCompleted ? .green : .secondary)
-                    .imageScale(.large)
-                    .accessibilityLabel(item.isCompleted ? "Mark as todo" : "Mark as done")
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(list.title)
+                    .font(.headline)
+                Text("\(list.activeItems.count) remaining • \(list.completedItems.count) done")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-
-            Text(item.title)
+            Spacer()
+            Image(systemName: "chevron.right")
+                .foregroundStyle(.secondary)
         }
-        .buttonStyle(.plain)
+        .padding(.vertical, 6)
     }
 }
 
@@ -171,5 +200,5 @@ private extension Color {
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
+        .modelContainer(for: [ChecklistList.self, ChecklistItem.self], inMemory: true)
 }
